@@ -5,11 +5,15 @@
 # backgound image changing overtime.
 
 import sensor, image, pyb, os, time
+TRIGGER_THRESHOLD = 5
 
+BG_UPDATE_FRAMES = 50 # How many frames before blending.
+BG_UPDATE_BLEND = 128 # How much to blend by... ([0-256]==[0.0-1.0]).
+
+BLOB_THRESHOLD = (24, 255)
 
 def findBlobs(img):
-    threshold = (24,255)
-    blobs = img.find_blobs([threshold])
+    blobs = img.find_blobs([BLOB_THRESHOLD])
     for b in blobs:
         img.draw_rectangle(b[0:4])
         print("===\n Blob %s" % str(b))
@@ -22,34 +26,36 @@ def isTriggered(img):
     # value. The difference between the two values will grow as the difference
     # image seems more pixels change.
     diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
-    triggered = diff > TRIGGER_THRESHOLD
-    return triggered
+    trig = diff > TRIGGER_THRESHOLD
+    return trig
+
+def initSensor():
+    sensor.reset() # Initialize the camera sensor.
+    sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
+    sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
+    sensor.skip_frames(time = 2000) # Let new settings take affect.
+    sensor.set_auto_whitebal(False) # Turn off white balance.
+
+def initFrameBuffer():
+    # Take from the main frame buffer's RAM to allocate a second frame buffer.
+    # There's a lot more RAM in the frame buffer than in the MicroPython heap.
+    # However, after doing this you have a lot less RAM for some algorithms...
+    # So, be aware that it's a lot easier to get out of RAM issues now. However,
+    # frame differencing doesn't use a lot of the extra space in the frame buffer.
+    # But, things like AprilTags do and won't work if you do this...
+    extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
+
+    print("About to save background image...")
+    sensor.skip_frames(time = 2000) # Give the user time to get ready.
+    extra_fb.replace(sensor.snapshot())
+    print("Saved background image - Now frame differencing!")
+    return extra_fb
 
 
-TRIGGER_THRESHOLD = 5
-
-BG_UPDATE_FRAMES = 50 # How many frames before blending.
-BG_UPDATE_BLEND = 128 # How much to blend by... ([0-256]==[0.0-1.0]).
-
-sensor.reset() # Initialize the camera sensor.
-sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
-sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
-sensor.skip_frames(time = 2000) # Let new settings take affect.
-sensor.set_auto_whitebal(False) # Turn off white balance.
+initSensor()
 clock = time.clock() # Tracks FPS.
 
-# Take from the main frame buffer's RAM to allocate a second frame buffer.
-# There's a lot more RAM in the frame buffer than in the MicroPython heap.
-# However, after doing this you have a lot less RAM for some algorithms...
-# So, be aware that it's a lot easier to get out of RAM issues now. However,
-# frame differencing doesn't use a lot of the extra space in the frame buffer.
-# But, things like AprilTags do and won't work if you do this...
-extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
-
-print("About to save background image...")
-sensor.skip_frames(time = 2000) # Give the user time to get ready.
-extra_fb.replace(sensor.snapshot())
-print("Saved background image - Now frame differencing!")
+extra_fb = initFrameBuffer()
 
 triggered = False
 
