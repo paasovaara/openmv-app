@@ -15,6 +15,16 @@ def findBlobs(img):
         print("===\n Blob %s" % str(b))
     return blobs
 
+def isTriggered(img):
+    hist = img.get_histogram()
+    # This code below works by comparing the 99th percentile value (e.g. the
+    # non-outlier max value against the 90th percentile value (e.g. a non-max
+    # value. The difference between the two values will grow as the difference
+    # image seems more pixels change.
+    diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
+    triggered = diff > TRIGGER_THRESHOLD
+    return triggered
+
 
 TRIGGER_THRESHOLD = 5
 
@@ -64,14 +74,7 @@ while(True):
     img.difference(extra_fb)
 
     findBlobs(img)
-
-    hist = img.get_histogram()
-    # This code below works by comparing the 99th percentile value (e.g. the
-    # non-outlier max value against the 90th percentile value (e.g. a non-max
-    # value. The difference between the two values will grow as the difference
-    # image seems more pixels change.
-    diff = hist.get_percentile(0.99).l_value() - hist.get_percentile(0.90).l_value()
-    triggered = diff > TRIGGER_THRESHOLD
+    triggered = isTriggered(img)
 
     print(clock.fps(), triggered) # Note: Your OpenMV Cam runs about half as fast while
     # connected to your computer. The FPS should increase once disconnected.
