@@ -6,6 +6,16 @@
 
 import sensor, image, pyb, os, time
 
+
+def findBlobs(img):
+    threshold = (24,255)
+    blobs = img.find_blobs([threshold])
+    for b in blobs:
+        img.draw_rectangle(b[0:4])
+        print("===\n Blob %s" % str(b))
+    return blobs
+
+
 TRIGGER_THRESHOLD = 5
 
 BG_UPDATE_FRAMES = 50 # How many frames before blending.
@@ -52,6 +62,8 @@ while(True):
 
     # Replace the image with the "abs(NEW-OLD)" frame difference.
     img.difference(extra_fb)
+
+    findBlobs(img)
 
     hist = img.get_histogram()
     # This code below works by comparing the 99th percentile value (e.g. the
