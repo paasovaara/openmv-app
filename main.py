@@ -8,9 +8,31 @@ import sensor, image, pyb, os, time
 TRIGGER_THRESHOLD = 5
 
 BG_UPDATE_FRAMES = 50 # How many frames before blending.
-BG_UPDATE_BLEND = 128 # How much to blend by... ([0-256]==[0.0-1.0]).
+BG_UPDATE_BLEND = 127 # How much to blend by... ([0-256]==[0.0-1.0]).
 
-BLOB_THRESHOLD = (24, 255)
+BLOB_THRESHOLD = (20, 255)
+MORPHOLOGY_ROUNDS = 3
+
+IMG_TYPE = sensor.GRAYSCALE # or RGB565
+
+def preprocess(img):
+    #img.open(1)
+    #img.close(1)
+    morphOpen(img)
+    morphClose(img)
+
+def morphOpen(img):
+    for rounds in range(0, MORPHOLOGY_ROUNDS):
+        img.erode(1)
+    for rounds in range(0, MORPHOLOGY_ROUNDS):
+        img.dilate(1)
+
+def morphClose(img):
+    for rounds in range(0, MORPHOLOGY_ROUNDS):
+        img.dilate(1)
+    for rounds in range(0, MORPHOLOGY_ROUNDS):
+        img.erode(1)
+
 
 def findBlobs(img):
     blobs = img.find_blobs([BLOB_THRESHOLD])
@@ -31,7 +53,8 @@ def isTriggered(img):
 
 def initSensor():
     sensor.reset() # Initialize the camera sensor.
-    sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
+    #sensor.set_pixformat(sensor.RGB565) # or sensor.RGB565
+    sensor.set_pixformat(IMG_TYPE)
     sensor.set_framesize(sensor.QVGA) # or sensor.QQVGA (or others)
     sensor.skip_frames(time = 2000) # Let new settings take affect.
     sensor.set_auto_whitebal(False) # Turn off white balance.
@@ -43,7 +66,7 @@ def initFrameBuffer():
     # So, be aware that it's a lot easier to get out of RAM issues now. However,
     # frame differencing doesn't use a lot of the extra space in the frame buffer.
     # But, things like AprilTags do and won't work if you do this...
-    extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), sensor.RGB565)
+    extra_fb = sensor.alloc_extra_fb(sensor.width(), sensor.height(), IMG_TYPE)
 
     print("About to save background image...")
     sensor.skip_frames(time = 2000) # Give the user time to get ready.
@@ -78,6 +101,10 @@ while(True):
 
     # Replace the image with the "abs(NEW-OLD)" frame difference.
     img.difference(extra_fb)
+
+    #threshold the image
+    img.binary([BLOB_THRESHOLD])
+    preprocess(img)
 
     findBlobs(img)
     triggered = isTriggered(img)
